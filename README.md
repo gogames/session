@@ -1,5 +1,7 @@
 session provider
 ===
+[![GoDoc](http://godoc.org/github.com/gogames/session?status.svg)](http://godoc.org/github.com/gogames/session)
+[![Go Walker](http://gowalker.org/api/v1/badge)](http://gowalker.org/github.com/gogames/session)
 
 ### Features
 

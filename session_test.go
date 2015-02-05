@@ -6,13 +6,17 @@ import (
 	"time"
 )
 
+type specialType struct {
+	A *specialType
+}
+
 func Test_Session(t *testing.T) {
 	test(t, fileSession())
 	test(t, memorySession())
 }
 
 func test(t *testing.T, s *Session) {
-	sid, key, val := "", "helloKey", "helloWorld"
+	sid, key, val := "", "helloKey", specialType{}
 
 	sid, err := s.Set(sid, key, val)
 	if err != nil {
@@ -20,7 +24,7 @@ func test(t *testing.T, s *Session) {
 	}
 	t.Log(sid)
 
-	if s.Get(sid, key).(string) != val {
+	if s.Get(sid, key).(specialType) != val {
 		t.Fatalf("the value is not %v", val)
 	}
 

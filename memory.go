@@ -9,7 +9,7 @@ import (
 const STORE_MEMORY = "memory"
 
 type memory struct {
-	data       map[interface{}]interface{}
+	data       map[string]interface{}
 	lastUpdate time.Time
 
 	sid string
@@ -22,7 +22,7 @@ func init() {
 
 func newMemoryStore(sid string, conf string) SessionStore {
 	return &memory{
-		data:       make(map[interface{}]interface{}),
+		data:       make(map[string]interface{}),
 		lastUpdate: time.Now(),
 		sid:        sid,
 	}
@@ -51,7 +51,7 @@ func (m *memory) Update() error {
 
 func (m *memory) Init() {}
 
-func (m *memory) Iterate(f func(key, val interface{})) {
+func (m *memory) Iterate(f func(key string, val interface{})) {
 	m.withReadLock(func() {
 		for key, val := range m.data {
 			f(key, val)
@@ -59,7 +59,7 @@ func (m *memory) Iterate(f func(key, val interface{})) {
 	})
 }
 
-func (m *memory) Set(key, val interface{}) error {
+func (m *memory) Set(key string, val interface{}) error {
 	m.withWriteLock(func() {
 		m.data[key] = val
 		m.update()
@@ -67,12 +67,12 @@ func (m *memory) Set(key, val interface{}) error {
 	return nil
 }
 
-func (m *memory) Get(key interface{}) (val interface{}) {
+func (m *memory) Get(key string) (val interface{}) {
 	m.withReadLock(func() { val = m.data[key] })
 	return
 }
 
-func (m *memory) Delete(key interface{}) error {
+func (m *memory) Delete(key string) error {
 	m.withWriteLock(func() {
 		delete(m.data, key)
 		m.update()

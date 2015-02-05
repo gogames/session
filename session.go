@@ -16,11 +16,11 @@ const (
 )
 
 type SessionStore interface {
-	Iterate(func(key, val interface{}))
-	Set(key, val interface{}) error
-	Get(interface{}) interface{}
+	Set(key string, val interface{}) error
+	Get(string) interface{}
+	Delete(string) error
+	Iterate(func(key string, val interface{}))
 	Update() error
-	Delete(interface{}) error
 	LastUpdate() time.Time
 	SessionId() string
 	Expire() error
@@ -101,7 +101,7 @@ func (s *Session) Flush() {
 }
 
 // get a key
-func (s *Session) Get(sid string, key interface{}) (val interface{}) {
+func (s *Session) Get(sid string, key string) (val interface{}) {
 	if sid == _EMPTY_STRING {
 		return
 	}
@@ -114,7 +114,7 @@ func (s *Session) Get(sid string, key interface{}) (val interface{}) {
 }
 
 // if the sid is empty string, new sessionId will be returned
-func (s *Session) Set(sid string, key, val interface{}) (sessionId string, err error) {
+func (s *Session) Set(sid string, key string, val interface{}) (sessionId string, err error) {
 	s.do(func() {
 		var cont bool
 		if sid != _EMPTY_STRING {
@@ -139,7 +139,7 @@ func (s *Session) Set(sid string, key, val interface{}) (sessionId string, err e
 }
 
 // delete a key
-func (s *Session) Delete(sid string, key interface{}) (err error) {
+func (s *Session) Delete(sid string, key string) (err error) {
 	if sid == _EMPTY_STRING {
 		return
 	}

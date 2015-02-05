@@ -1,7 +1,10 @@
 session provider
 ===
 
-Simple enough...
+* Stand alone, not coupled with cookie.
+
+* Thread safe
+
 
 ### Install
 
@@ -11,7 +14,7 @@ Simple enough...
 ### How to use
 
 ```go
-	sess := session.NewSession(time.Hour, `{"path":"session_path"}`).SetProvider(session.STORE_FILE)
+	sess := session.NewSession(session.STORE_FILE, time.Hour, `{"path":"session_path", "separator": "/"}`)
 
 	// create a new session
 	sid, err := sess.Set("", "key", "value")

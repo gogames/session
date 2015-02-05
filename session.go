@@ -11,15 +11,17 @@ import (
 )
 
 const (
-	_SID_LENGTH   = 1 << 4
-	_EMPTY_STRING = ""
+	_SID_LENGTH   = 1 << 4 // session id length
+	_EMPTY_STRING = ""     // used to check empty string
 )
 
+// a session store should provide these functions
+//
 type SessionStore interface {
-	Set(key string, val interface{}) error
+	Set(string, interface{}) error
 	Get(string) interface{}
 	Delete(string) error
-	Iterate(func(key string, val interface{}))
+	Iterate(func(key string, val interface{})) // iterate all key-value pairs
 	Update() error
 	LastUpdate() time.Time
 	SessionId() string
@@ -27,8 +29,12 @@ type SessionStore interface {
 	Init()
 }
 
+// entries
+//
 var sessions = make(map[string]func(string, string) SessionStore)
 
+// register a session store
+//
 func Register(sessionStoreName string, f func(string, string) SessionStore) {
 	if _, ok := sessions[sessionStoreName]; ok {
 		panic(fmt.Sprintf("can not register %v twice", sessionStoreName))
@@ -36,6 +42,8 @@ func Register(sessionStoreName string, f func(string, string) SessionStore) {
 	sessions[sessionStoreName] = f
 }
 
+// thread safe session
+//
 type Session struct {
 	sessions map[string]SessionStore
 
@@ -74,6 +82,9 @@ func NewSession(sessionStoreName string, gcDuration time.Duration, conf string) 
 	return s
 }
 
+// waits for all operations to finish
+// usually used with graceful exit, ensure data integrity
+//
 func (s *Session) Close() {
 	if s.isClosed {
 		return
@@ -87,7 +98,9 @@ func (s *Session) Close() {
 	return
 }
 
-// remove all sessions
+// remove all sessions and close
+// if session is closed, do nothing
+//
 func (s *Session) Flush() {
 	s.do(func() {
 		s.withWriteLock(func() {
@@ -100,7 +113,9 @@ func (s *Session) Flush() {
 	s.Close()
 }
 
-// get a key
+// get a key from session store
+// if session is closed, do nothing
+//
 func (s *Session) Get(sid string, key string) (val interface{}) {
 	if sid == _EMPTY_STRING {
 		return
@@ -113,7 +128,10 @@ func (s *Session) Get(sid string, key string) (val interface{}) {
 	return
 }
 
-// if the sid is empty string, new sessionId will be returned
+// set key-value pair
+// if the sid is empty string, new generated sessionId will be returned
+// if session is closed, do nothing
+//
 func (s *Session) Set(sid string, key string, val interface{}) (sessionId string, err error) {
 	s.do(func() {
 		var cont bool
@@ -138,7 +156,9 @@ func (s *Session) Set(sid string, key string, val interface{}) (sessionId string
 	return
 }
 
-// delete a key
+// delete a key-value pair
+// if session is closed, do nothing
+//
 func (s *Session) Delete(sid string, key string) (err error) {
 	if sid == _EMPTY_STRING {
 		return
@@ -153,7 +173,9 @@ func (s *Session) Delete(sid string, key string) (err error) {
 	return
 }
 
-// update session life time
+// update session life time according to session id
+// if session is closed, do nothing
+//
 func (s *Session) Update(sid string) (err error) {
 	if sid == _EMPTY_STRING {
 		return
@@ -169,7 +191,9 @@ func (s *Session) Update(sid string) (err error) {
 	return
 }
 
-// expire the session
+// expire the session according to session id
+// if session is closed, do nothing
+//
 func (s *Session) Expire(sid string) (err error) {
 	if sid == _EMPTY_STRING {
 		return
@@ -186,6 +210,8 @@ func (s *Session) Expire(sid string) (err error) {
 }
 
 // iterate all sessions
+// if session is closed, do nothing
+//
 func (s *Session) Iterate(f func(sid string, ss SessionStore)) {
 	s.do(func() {
 		s.withReadLock(func() {

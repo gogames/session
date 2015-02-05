@@ -1,7 +1,9 @@
 session provider
 ===
 
-* Stand alone, not coupled with cookie.
+### Features
+
+* Stand alone, not coupled with cookie which is annoying...
 
 * Thread safe
 
@@ -34,3 +36,15 @@ session provider
 	// expire session
 	err = sess.Expire(sid)
 ```
+
+### TODO
+
+Implement the following session providers
+
+* Redis
+* SSDB
+* Memcache
+* Mongo
+* Mysql
+* Postgresql
+* Sqlite3

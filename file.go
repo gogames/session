@@ -81,7 +81,7 @@ func (f *file) Delete(key string) error {
 
 // expire session
 func (f *file) Expire() error {
-	return os.Remove(f.getDir())
+	return os.RemoveAll(f.getDir())
 }
 
 // change mtime and atime

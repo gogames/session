@@ -42,7 +42,9 @@ func test(t *testing.T, s *Session) {
 		t.Fatal("should be lo")
 	}
 
-	s.Close()
+	if err := s.Flush(); err != nil {
+		t.Fatal(err)
+	}
 
 	if nsid, _ = s.Set(nsid, "what", "the"); nsid != "" {
 		t.Fatal("still can set after session is close")

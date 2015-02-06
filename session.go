@@ -101,16 +101,19 @@ func (s *Session) Close() {
 // remove all sessions and close
 // if session is closed, do nothing
 //
-func (s *Session) Flush() {
+func (s *Session) Flush() (err error) {
+	defer s.Close()
 	s.do(func() {
 		s.withWriteLock(func() {
 			for sid, ss := range s.sessions {
-				ss.Expire()
+				if err = ss.Expire(); err != nil {
+					return
+				}
 				delete(s.sessions, sid)
 			}
 		})
 	})
-	s.Close()
+	return
 }
 
 // get a key from session store

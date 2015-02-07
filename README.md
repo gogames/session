@@ -10,6 +10,7 @@ session provider
 
 * Thread safe
 
+* LRU for quick gc scan
 
 ### Install
 

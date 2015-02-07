@@ -19,7 +19,10 @@ session provider
 ### How to use
 
 ```go
-	sess := session.NewSession(session.STORE_FILE, time.Hour, `{"path":"session_path", "separator": "/"}`)
+	gcFrequency := time.Second
+	sessionLifeTime := time.Hour
+	
+	sess := session.NewSession(session.STORE_FILE, gcFrequency, sessionLifeTime, `{"path":"session_path", "separator": "/"}`)
 
 	// create a new session
 	sid, err := sess.Set("", "key", "value")

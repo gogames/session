@@ -52,7 +52,7 @@ func test(t *testing.T, s *Session) {
 
 func fileSession() *Session {
 	config, _ := json.Marshal(map[string]interface{}{
-		"path":      "/Users/cc/workspace/gopath/src/github.com/gogames/session/dir",
+		"path":      "dir",
 		"separator": "/",
 	})
 

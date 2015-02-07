@@ -1,12 +1,8 @@
 session provider
 ===
 [![GoDoc](http://godoc.org/github.com/gogames/session?status.svg)](http://godoc.org/github.com/gogames/session)
-
 [![Build Status](https://travis-ci.org/gogames/session.svg?branch=master)](https://travis-ci.org/gogames/session)
-
 [![status](https://sourcegraph.com/api/repos/github.com/gogames/session/.badges/status.png)](https://sourcegraph.com/github.com/gogames/session)
-[![library users](https://sourcegraph.com/api/repos/github.com/gogames/session/.badges/library-users.png)](https://sourcegraph.com/github.com/gogames/session)
-[![dependents](https://sourcegraph.com/api/repos/github.com/gogames/session/.badges/dependents.png)](https://sourcegraph.com/github.com/gogames/session)
 
 ### Features
 

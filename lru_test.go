@@ -26,9 +26,12 @@ func Test_LRU(t *testing.T) {
 	lru.put("sessionid1", time.Now())
 	lru.put("sessionid4", time.Now())
 
-	if len(lru.removeExpiredItems(func(val interface{}) bool {
+	keys := lru.findExpiredItems(func(val interface{}) bool {
 		return time.Since(val.(time.Time)) > 5*time.Second
-	})) != 2 {
+	})
+	lru.remove(keys...)
+
+	if len(keys) != 2 {
 		t.Fatal("there should be 2 items removed")
 	}
 

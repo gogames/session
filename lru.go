@@ -59,30 +59,34 @@ func (l *lru) put(k, v interface{}) {
 	})
 }
 
-// iterate lru, from front to back, remove the expired items
+// remove items
 //
-func (l *lru) removeExpiredItems(isExpired func(value interface{}) bool) []interface{} {
-	removeItems := make([]interface{}, 0)
+func (l *lru) remove(ks ...interface{}) {
+	l.withLock(func() {
+		for _, k := range ks {
+			if e, ok := l.cache[k]; ok {
+				l.l.Remove(e)
+				delete(l.cache, k)
+			}
+		}
+	})
+}
+
+// iterate lru, from front to back, find expired items
+//
+func (l *lru) findExpiredItems(isExpired func(value interface{}) bool) []interface{} {
+	expiredItems := make([]interface{}, 0)
 
 	l.withLock(func() {
-		for e := l.l.Front(); e != nil; {
-			elem := e.Value.(element)
-			key, val := elem.key, elem.val
-
-			// if expired, remove item both in map and list
-			if isExpired(val) {
-				tmpElem := e.Next()
-				l.l.Remove(e)
-				delete(l.cache, key)
-				e = tmpElem
-				removeItems = append(removeItems, key)
-			} else {
-				e = e.Next()
+		for e := l.l.Front(); e != nil; e = e.Next() {
+			// if expired, put it in slice
+			if isExpired(e.Value.(element).val) {
+				expiredItems = append(expiredItems, e.Value.(element).key)
 			}
 		}
 	})
 
-	return removeItems
+	return expiredItems
 }
 
 // print lru

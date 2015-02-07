@@ -116,6 +116,7 @@ func (s *Session) Flush() (err error) {
 					return
 				}
 				delete(s.sessions, sid)
+				s.lru.remove(sid)
 			}
 		})
 	})
@@ -214,6 +215,7 @@ func (s *Session) Expire(sid string) (err error) {
 				err = ss.Expire()
 			}
 			delete(s.sessions, sid)
+			s.lru.remove(sid)
 		})
 	})
 	return
@@ -225,9 +227,12 @@ func (s *Session) gc() {
 		case t := <-time.Tick(s.gcFrequency):
 			s.do(func() {
 				s.withWriteLock(func() {
-					for _, sidInterface := range s.lru.removeExpiredItems(func(value interface{}) bool {
+					sids := s.lru.findExpiredItems(func(value interface{}) bool {
 						return t.Sub(value.(time.Time)) > s.gcDuration
-					}) {
+					})
+					s.lru.remove(sids...)
+
+					for _, sidInterface := range sids {
 						sid := sidInterface.(string)
 						s.sessions[sid].Expire()
 						delete(s.sessions, sid)

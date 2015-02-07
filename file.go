@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -22,7 +23,7 @@ func newFileStore(sid string, conf string) SessionStore {
 	f := &file{sid: sid}
 	f.parseConf(conf)
 	if sid != _EMPTY_STRING {
-		if err := os.Mkdir(f.getDir(), os.ModePerm); err != nil {
+		if err := os.MkdirAll(f.getDir(), os.ModePerm); err != nil {
 			panic(err)
 		}
 	}
@@ -33,31 +34,24 @@ func (f *file) SessionId() string {
 	return f.sid
 }
 
-func (f *file) Init() {
-	if _, err := os.Stat(f.path); os.IsNotExist(err) {
-		if err = os.Mkdir(f.path, os.ModePerm); err != nil {
-			panic(fmt.Errorf("can not mkdir: %v", err))
-		}
+func (f *file) Init() map[string]time.Time {
+	if err := os.MkdirAll(f.path, os.ModePerm); err != nil {
+		panic(fmt.Errorf("can not mkdir: %v", err))
 	}
-}
 
-func (f *file) Iterate(fc func(key string, val interface{})) {
+	m := make(map[string]time.Time)
 	filepath.Walk(f.getDir(), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() {
-			return nil
+		p := strings.TrimLeft(path, f.getDir())
+		if info.IsDir() && p != "" && !strings.Contains(p, f.pathSeparator) {
+			m[info.Name()] = info.ModTime()
 		}
-
-		// get key and value
-		b, err := ioutil.ReadFile(info.Name())
-		if err != nil {
-			return err
-		}
-		fc(info.Name(), unmarshal(b))
 		return nil
 	})
+
+	return m
 }
 
 // set value

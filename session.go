@@ -15,23 +15,24 @@ const (
 	_EMPTY_STRING = ""     // used to check empty string
 )
 
+var defaultGCFrequency = time.Second
+
 // a session store should provide these functions
 //
 type SessionStore interface {
 	Set(string, interface{}) error
 	Get(string) interface{}
 	Delete(string) error
-	Iterate(func(key string, val interface{})) // iterate all key-value pairs
 	Update() error
 	LastUpdate() time.Time
 	SessionId() string
 	Expire() error
-	Init()
+	Init() map[string]time.Time
 }
 
 // entries
 //
-var sessions = make(map[string]func(string, string) SessionStore)
+var sessions = make(map[string]func(sid string, conf string) SessionStore)
 
 // register a session store
 //
@@ -49,6 +50,9 @@ type Session struct {
 
 	storeProvider func(string, string) SessionStore
 
+	// used for quick gc, not scan all session any more
+	lru *lru
+
 	// gc
 	gcFrequency time.Duration
 	gcDuration  time.Duration
@@ -65,11 +69,12 @@ type Session struct {
 func NewSession(sessionStoreName string, gcDuration time.Duration, conf string) *Session {
 	s := &Session{
 		gcDuration:   gcDuration,
-		gcFrequency:  time.Minute,
+		gcFrequency:  defaultGCFrequency,
 		closeCounter: new(int64),
 		closeChan:    make(chan struct{}),
 		conf:         conf,
 		sessions:     make(map[string]SessionStore),
+		lru:          newLRU(),
 	}
 
 	// choose a store
@@ -77,7 +82,10 @@ func NewSession(sessionStoreName string, gcDuration time.Duration, conf string) 
 		panic(fmt.Sprintf("session store %v is not registered", sessionStoreName))
 	} else {
 		s.storeProvider = sp
-		sp(_EMPTY_STRING, s.conf).Init()
+		for sessionId, lastUpdate := range sp(_EMPTY_STRING, conf).Init() {
+			s.lru.put(sessionId, lastUpdate)
+			s.sessions[sessionId] = s.storeProvider(sessionId, conf)
+		}
 	}
 
 	// start gc
@@ -87,8 +95,18 @@ func NewSession(sessionStoreName string, gcDuration time.Duration, conf string) 
 }
 
 // set gc frequency, dont make it too short
-func (s *Session) SetGCFrequency(d time.Duration) {
-	s.gcFrequency = d
+func (s *Session) SetGCFrequency(d time.Duration) *Session {
+	s.withWriteLock(func() {
+		s.gcFrequency = d
+	})
+	return s
+}
+
+func (s *Session) getGCFrequency() (gcFrequency time.Duration) {
+	s.withReadLock(func() {
+		gcFrequency = s.gcFrequency
+	})
+	return
 }
 
 // waits for all operations to finish
@@ -164,6 +182,7 @@ func (s *Session) Set(sid string, key string, val interface{}) (sessionId string
 			})
 		}
 		sessionId = sid
+		s.lru.put(sessionId, time.Now())
 	})
 	return
 }
@@ -221,19 +240,6 @@ func (s *Session) Expire(sid string) (err error) {
 	return
 }
 
-// iterate all sessions
-// if session is closed, do nothing
-//
-func (s *Session) Iterate(f func(sid string, ss SessionStore)) {
-	s.do(func() {
-		s.withReadLock(func() {
-			for sid, ss := range s.sessions {
-				f(sid, ss)
-			}
-		})
-	})
-}
-
 func (s *Session) acquire() { atomic.AddInt64(s.closeCounter, 1) }
 
 func (s *Session) release() { atomic.AddInt64(s.closeCounter, -1) }
@@ -250,14 +256,15 @@ func (s *Session) do(f func()) {
 func (s *Session) gc() {
 	for {
 		select {
-		case t := <-time.Tick(s.gcFrequency):
+		case t := <-time.Tick(s.getGCFrequency()):
 			s.do(func() {
 				s.withWriteLock(func() {
-					for sid, ss := range s.sessions {
-						if t.Sub(ss.LastUpdate()) > s.gcDuration {
-							ss.Expire()
-							delete(s.sessions, sid)
-						}
+					for _, sidInterface := range s.lru.removeExpiredItems(func(value interface{}) bool {
+						return t.Sub(value.(time.Time)) > s.gcDuration
+					}) {
+						sid := sidInterface.(string)
+						s.sessions[sid].Expire()
+						delete(s.sessions, sid)
 					}
 				})
 			})

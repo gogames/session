@@ -22,16 +22,15 @@ func test(t *testing.T, s *Session) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log(sid)
 
 	if s.Get(sid, key).(specialType) != val {
 		t.Fatalf("the value is not %v", val)
 	}
 
-	time.Sleep(70 * time.Second)
+	time.Sleep(time.Second)
 
-	if s.Get(sid, key) != nil {
-		t.Fatal("the value should be nil interface{}")
+	if value := s.Get(sid, key); value != nil {
+		t.Fatalf("the value should be nil interface{} but get %v", value)
 	}
 
 	nsid, err := s.Set("", "ha", "lo")
@@ -53,13 +52,13 @@ func test(t *testing.T, s *Session) {
 
 func fileSession() *Session {
 	config, _ := json.Marshal(map[string]interface{}{
-		"path":      "dir",
+		"path":      "/Users/cc/workspace/gopath/src/github.com/gogames/session/dir",
 		"separator": "/",
 	})
 
-	return NewSession(STORE_FILE, time.Minute, string(config))
+	return NewSession(STORE_FILE, time.Millisecond, string(config)).SetGCFrequency(time.Millisecond)
 }
 
 func memorySession() *Session {
-	return NewSession(STORE_MEMORY, time.Minute, "")
+	return NewSession(STORE_MEMORY, time.Millisecond, "").SetGCFrequency(time.Millisecond)
 }

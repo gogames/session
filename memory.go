@@ -49,7 +49,7 @@ func (m *memory) Update() error {
 	return nil
 }
 
-func (m *memory) Init() {}
+func (m *memory) Init() map[string]time.Time { return nil }
 
 func (m *memory) Iterate(f func(key string, val interface{})) {
 	m.withReadLock(func() {

@@ -1,11 +1,13 @@
 session provider
 ===
 [![GoDoc](http://godoc.org/github.com/gogames/session?status.svg)](http://godoc.org/github.com/gogames/session)
-[![Go Walker](http://gowalker.org/api/v1/badge)](http://gowalker.org/github.com/gogames/session)
+[![status](https://sourcegraph.com/api/repos/github.com/gogames/session/.badges/status.png)](https://sourcegraph.com/github.com/gogames/session)
+[![library users](https://sourcegraph.com/api/repos/github.com/gogames/session/.badges/library-users.png)](https://sourcegraph.com/github.com/gogames/session)
+[![dependents](https://sourcegraph.com/api/repos/github.com/gogames/session/.badges/dependents.png)](https://sourcegraph.com/github.com/gogames/session)
 
 ### Features
 
-* Stand alone, not coupled with cookie which is annoying...
+* Stand alone, not coupled with cookie
 
 * Thread safe
 
@@ -37,6 +39,10 @@ session provider
 
 	// expire session
 	err = sess.Expire(sid)
+
+	// close session, wait util all session operations done
+	// useful function used in graceful exit program
+	sess.Close()
 ```
 
 ### TODO

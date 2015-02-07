@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
 const (
-	_SID_LENGTH   = 1 << 4 // session id length
-	_EMPTY_STRING = ""     // used to check empty string
+	_SID_LENGTH   = 1 << 4  // session id length
+	_EMPTY_STRING = ""      // used to check empty string
+	_BUFFER       = 1 << 16 // at most process _BUFFER job in the mean time
 )
 
 var defaultGCFrequency = time.Second
@@ -57,24 +57,24 @@ type Session struct {
 	gcFrequency time.Duration
 	gcDuration  time.Duration
 
-	closeCounter *int64
-	closeChan    chan struct{}
-	isClosed     bool
+	closeSignal chan struct{}
+	closeChan   chan struct{}
+	isClosed    bool
 
 	conf string
 
 	rwl sync.RWMutex
 }
 
-func NewSession(sessionStoreName string, gcDuration time.Duration, conf string) *Session {
+func NewSession(sessionStoreName string, gcFrequency, gcDuration time.Duration, conf string) *Session {
 	s := &Session{
-		gcDuration:   gcDuration,
-		gcFrequency:  defaultGCFrequency,
-		closeCounter: new(int64),
-		closeChan:    make(chan struct{}),
-		conf:         conf,
-		sessions:     make(map[string]SessionStore),
-		lru:          newLRU(),
+		gcDuration:  gcDuration,
+		gcFrequency: gcFrequency,
+		closeSignal: make(chan struct{}),
+		closeChan:   make(chan struct{}, _BUFFER),
+		conf:        conf,
+		sessions:    make(map[string]SessionStore),
+		lru:         newLRU(),
 	}
 
 	// choose a store
@@ -94,42 +94,21 @@ func NewSession(sessionStoreName string, gcDuration time.Duration, conf string) 
 	return s
 }
 
-// set gc frequency, dont make it too short
-func (s *Session) SetGCFrequency(d time.Duration) *Session {
-	s.withWriteLock(func() {
-		s.gcFrequency = d
-	})
-	return s
-}
-
-func (s *Session) getGCFrequency() (gcFrequency time.Duration) {
-	s.withReadLock(func() {
-		gcFrequency = s.gcFrequency
-	})
-	return
-}
-
 // waits for all operations to finish
 // usually used with graceful exit, ensure data integrity
 //
 func (s *Session) Close() {
-	if s.isClosed {
-		return
-	}
-	for atomic.LoadInt64(s.closeCounter) > 0 {
+	s.withWriteLock(func() { s.isClosed = true })
+	for len(s.closeChan) > 0 {
 		time.Sleep(10 * time.Millisecond)
 	}
-	s.isClosed = true
-	s.closeChan <- struct{}{}
-	s.sessions = nil
-	return
+	s.closeSignal <- struct{}{}
 }
 
-// remove all sessions and close
+// remove all sessions
 // if session is closed, do nothing
 //
 func (s *Session) Flush() (err error) {
-	defer s.Close()
 	s.do(func() {
 		s.withWriteLock(func() {
 			for sid, ss := range s.sessions {
@@ -240,23 +219,10 @@ func (s *Session) Expire(sid string) (err error) {
 	return
 }
 
-func (s *Session) acquire() { atomic.AddInt64(s.closeCounter, 1) }
-
-func (s *Session) release() { atomic.AddInt64(s.closeCounter, -1) }
-
-func (s *Session) do(f func()) {
-	if s.isClosed {
-		return
-	}
-	s.acquire()
-	defer s.release()
-	f()
-}
-
 func (s *Session) gc() {
 	for {
 		select {
-		case t := <-time.Tick(s.getGCFrequency()):
+		case t := <-time.Tick(s.gcFrequency):
 			s.do(func() {
 				s.withWriteLock(func() {
 					for _, sidInterface := range s.lru.removeExpiredItems(func(value interface{}) bool {
@@ -268,7 +234,7 @@ func (s *Session) gc() {
 					}
 				})
 			})
-		case <-s.closeChan:
+		case <-s.closeSignal:
 			return
 		}
 	}
@@ -284,6 +250,22 @@ func (s *Session) withWriteLock(f func()) {
 	s.rwl.Lock()
 	defer s.rwl.Unlock()
 	f()
+}
+
+func (s *Session) do(f func()) {
+	if s.closed() {
+		return
+	}
+	s.closeChan <- struct{}{}
+	defer func() { <-s.closeChan }()
+	f()
+}
+
+// check if closed
+func (s *Session) closed() bool {
+	s.rwl.RLock()
+	defer s.rwl.RUnlock()
+	return s.isClosed
 }
 
 func (s *Session) newSId() string {

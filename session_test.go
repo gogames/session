@@ -27,7 +27,7 @@ func test(t *testing.T, s *Session) {
 		t.Fatalf("the value is not %v", val)
 	}
 
-	time.Sleep(time.Second)
+	time.Sleep(5 * time.Millisecond)
 
 	if value := s.Get(sid, key); value != nil {
 		t.Fatalf("the value should be nil interface{} but get %v", value)
@@ -45,6 +45,8 @@ func test(t *testing.T, s *Session) {
 		t.Fatal(err)
 	}
 
+	s.Close()
+
 	if nsid, _ = s.Set(nsid, "what", "the"); nsid != "" {
 		t.Fatal("still can set after session is close")
 	}
@@ -56,9 +58,9 @@ func fileSession() *Session {
 		"separator": "/",
 	})
 
-	return NewSession(STORE_FILE, time.Millisecond, string(config)).SetGCFrequency(time.Millisecond)
+	return NewSession(STORE_FILE, time.Millisecond, time.Millisecond, string(config))
 }
 
 func memorySession() *Session {
-	return NewSession(STORE_MEMORY, time.Millisecond, "").SetGCFrequency(time.Millisecond)
+	return NewSession(STORE_MEMORY, time.Millisecond, time.Millisecond, "")
 }

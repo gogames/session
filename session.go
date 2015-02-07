@@ -54,8 +54,8 @@ type Session struct {
 	lru *lru
 
 	// gc
-	gcFrequency time.Duration
-	gcDuration  time.Duration
+	gcFrequency     time.Duration
+	sessionLifeTime time.Duration
 
 	closeSignal chan struct{}
 	closeChan   chan struct{}
@@ -66,15 +66,15 @@ type Session struct {
 	rwl sync.RWMutex
 }
 
-func NewSession(sessionStoreName string, gcFrequency, gcDuration time.Duration, conf string) *Session {
+func NewSession(sessionStoreName string, gcFrequency, sessionLifeTime time.Duration, conf string) *Session {
 	s := &Session{
-		gcDuration:  gcDuration,
-		gcFrequency: gcFrequency,
-		closeSignal: make(chan struct{}),
-		closeChan:   make(chan struct{}, _BUFFER),
-		conf:        conf,
-		sessions:    make(map[string]SessionStore),
-		lru:         newLRU(),
+		sessionLifeTime: sessionLifeTime,
+		gcFrequency:     gcFrequency,
+		closeSignal:     make(chan struct{}),
+		closeChan:       make(chan struct{}, _BUFFER),
+		conf:            conf,
+		sessions:        make(map[string]SessionStore),
+		lru:             newLRU(),
 	}
 
 	// choose a store
@@ -228,7 +228,7 @@ func (s *Session) gc() {
 			s.do(func() {
 				s.withWriteLock(func() {
 					sids := s.lru.findExpiredItems(func(value interface{}) bool {
-						return t.Sub(value.(time.Time)) > s.gcDuration
+						return t.Sub(value.(time.Time)) > s.sessionLifeTime
 					})
 					s.lru.remove(sids...)
 

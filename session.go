@@ -48,7 +48,10 @@ type Session struct {
 	sessions map[string]SessionStore
 
 	storeProvider func(string, string) SessionStore
-	gcDuration    time.Duration
+
+	// gc
+	gcFrequency time.Duration
+	gcDuration  time.Duration
 
 	closeCounter *int64
 	closeChan    chan struct{}
@@ -62,6 +65,7 @@ type Session struct {
 func NewSession(sessionStoreName string, gcDuration time.Duration, conf string) *Session {
 	s := &Session{
 		gcDuration:   gcDuration,
+		gcFrequency:  time.Minute,
 		closeCounter: new(int64),
 		closeChan:    make(chan struct{}),
 		conf:         conf,
@@ -80,6 +84,11 @@ func NewSession(sessionStoreName string, gcDuration time.Duration, conf string) 
 	go s.gc()
 
 	return s
+}
+
+// set gc frequency, dont make it too short
+func (s *Session) SetGCFrequency(d time.Duration) {
+	s.gcFrequency = d
 }
 
 // waits for all operations to finish
@@ -241,7 +250,7 @@ func (s *Session) do(f func()) {
 func (s *Session) gc() {
 	for {
 		select {
-		case t := <-time.Tick(time.Minute):
+		case t := <-time.Tick(s.gcFrequency):
 			s.do(func() {
 				s.withWriteLock(func() {
 					for sid, ss := range s.sessions {

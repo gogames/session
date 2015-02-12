@@ -6,13 +6,15 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 const (
-	_SID_LENGTH   = 1 << 4  // session id length
-	_EMPTY_STRING = ""      // used to check empty string
-	_BUFFER       = 1 << 16 // at most process _BUFFER job in the mean time
+	_SID_LENGTH   = 1 << 4 // session id length
+	_EMPTY_STRING = ""     // used to check empty string
+	_JOB_DONE     = 0
+	_CLOSED       = -4
 )
 
 var defaultGCFrequency = time.Second
@@ -58,8 +60,7 @@ type Session struct {
 	sessionLifeTime time.Duration
 
 	closeSignal chan struct{}
-	closeChan   chan struct{}
-	isClosed    bool
+	counter     *int64
 
 	conf string
 
@@ -71,7 +72,7 @@ func NewSession(sessionStoreName string, gcFrequency, sessionLifeTime time.Durat
 		sessionLifeTime: sessionLifeTime,
 		gcFrequency:     gcFrequency,
 		closeSignal:     make(chan struct{}),
-		closeChan:       make(chan struct{}, _BUFFER),
+		counter:         new(int64),
 		conf:            conf,
 		sessions:        make(map[string]SessionStore),
 		lru:             newLRU(),
@@ -98,9 +99,16 @@ func NewSession(sessionStoreName string, gcFrequency, sessionLifeTime time.Durat
 // usually used with graceful exit, ensure data integrity
 //
 func (s *Session) Close() {
-	s.withWriteLock(func() { s.isClosed = true })
-	for len(s.closeChan) > 0 {
-		time.Sleep(10 * time.Millisecond)
+	// check if all jobs are done
+	// if not, loop
+	// if done, send channel to stop gc()
+	for !atomic.CompareAndSwapInt64(s.counter, _JOB_DONE, _CLOSED) {
+		// double check, in case another goroutine dead loop
+		// although Close() would not be called twice in application layer
+		if atomic.CompareAndSwapInt64(s.counter, _CLOSED, _CLOSED) {
+			return
+		}
+		time.Sleep(time.Millisecond)
 	}
 	s.closeSignal <- struct{}{}
 }
@@ -258,19 +266,13 @@ func (s *Session) withWriteLock(f func()) {
 }
 
 func (s *Session) do(f func()) {
-	if s.closed() {
+	// check if it's already closed
+	if atomic.CompareAndSwapInt64(s.counter, _CLOSED, _CLOSED) {
 		return
 	}
-	s.closeChan <- struct{}{}
-	defer func() { <-s.closeChan }()
+	atomic.AddInt64(s.counter, 1)
+	defer atomic.AddInt64(s.counter, -1)
 	f()
-}
-
-// check if closed
-func (s *Session) closed() bool {
-	s.rwl.RLock()
-	defer s.rwl.RUnlock()
-	return s.isClosed
 }
 
 func (s *Session) newSId() string {

@@ -108,7 +108,7 @@ func (s *Session) Close() {
 		if atomic.CompareAndSwapInt64(s.counter, _CLOSED, _CLOSED) {
 			return
 		}
-		time.Sleep(time.Millisecond)
+		func() {}()
 	}
 	s.closeSignal <- struct{}{}
 }

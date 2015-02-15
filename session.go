@@ -230,9 +230,10 @@ func (s *Session) Expire(sid string) (err error) {
 }
 
 func (s *Session) gc() {
+	ticker := time.NewTicker(s.gcFrequency)
 	for {
 		select {
-		case t := <-time.Tick(s.gcFrequency):
+		case t := <-ticker.C:
 			s.do(func() {
 				s.withWriteLock(func() {
 					sids := s.lru.findExpiredItems(func(value interface{}) bool {
@@ -248,6 +249,7 @@ func (s *Session) gc() {
 				})
 			})
 		case <-s.closeSignal:
+			ticker.Stop()
 			return
 		}
 	}

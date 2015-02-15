@@ -11,10 +11,9 @@ import (
 )
 
 const (
-	_SID_LENGTH   = 1 << 4 // session id length
-	_EMPTY_STRING = ""     // used to check empty string
-	_JOB_DONE     = 0
-	_CLOSED       = -4
+	_SID_LENGTH = 1 << 4 // session id length
+	_JOB_DONE   = 0
+	_CLOSED     = -4
 )
 
 var defaultGCFrequency = time.Second
@@ -83,7 +82,7 @@ func NewSession(sessionStoreName string, gcFrequency, sessionLifeTime time.Durat
 		panic(fmt.Sprintf("session store %v is not registered", sessionStoreName))
 	} else {
 		s.storeProvider = sp
-		for sessionId, lastUpdate := range sp(_EMPTY_STRING, conf).Init() {
+		for sessionId, lastUpdate := range sp("", conf).Init() {
 			s.lru.put(sessionId, lastUpdate)
 			s.sessions[sessionId] = s.storeProvider(sessionId, conf)
 		}
@@ -135,7 +134,7 @@ func (s *Session) Flush() (err error) {
 // if session is closed, do nothing
 //
 func (s *Session) Get(sid string, key string) (val interface{}) {
-	if sid == _EMPTY_STRING {
+	if sid == "" || key == "" {
 		return
 	}
 	s.withReadLock(func() {
@@ -153,12 +152,14 @@ func (s *Session) Get(sid string, key string) (val interface{}) {
 func (s *Session) Set(sid string, key string, val interface{}) (sessionId string, err error) {
 	s.do(func() {
 		var cont bool
-		if sid != _EMPTY_STRING {
+		if sid != "" {
 			s.withReadLock(func() {
 				sp, ok := s.sessions[sid]
 				if ok {
 					cont = ok
-					err = sp.Set(key, val)
+					if key != "" {
+						err = sp.Set(key, val)
+					}
 				}
 			})
 		}
@@ -166,7 +167,9 @@ func (s *Session) Set(sid string, key string, val interface{}) (sessionId string
 			s.withWriteLock(func() {
 				sid = s.newSId()
 				s.sessions[sid] = s.storeProvider(sid, s.conf)
-				err = s.sessions[sid].Set(key, val)
+				if key != "" {
+					err = s.sessions[sid].Set(key, val)
+				}
 			})
 		}
 		sessionId = sid
@@ -179,7 +182,7 @@ func (s *Session) Set(sid string, key string, val interface{}) (sessionId string
 // if session is closed, do nothing
 //
 func (s *Session) Delete(sid string, key string) (err error) {
-	if sid == _EMPTY_STRING {
+	if sid == "" || key == "" {
 		return
 	}
 	s.do(func() {
@@ -196,7 +199,7 @@ func (s *Session) Delete(sid string, key string) (err error) {
 // if session is closed, do nothing
 //
 func (s *Session) Update(sid string) (err error) {
-	if sid == _EMPTY_STRING {
+	if sid == "" {
 		return
 	}
 	s.do(func() {
@@ -214,7 +217,7 @@ func (s *Session) Update(sid string) (err error) {
 // if session is closed, do nothing
 //
 func (s *Session) Expire(sid string) (err error) {
-	if sid == _EMPTY_STRING {
+	if sid == "" {
 		return
 	}
 	s.do(func() {

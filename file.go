@@ -22,7 +22,7 @@ type file struct {
 func newFileStore(sid string, conf string) SessionStore {
 	f := &file{sid: sid}
 	f.parseConf(conf)
-	if sid != _EMPTY_STRING {
+	if sid != "" {
 		if err := os.MkdirAll(f.getDir(), os.ModePerm); err != nil {
 			panic(err)
 		}

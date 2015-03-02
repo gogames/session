@@ -233,6 +233,10 @@ func (s *Session) Expire(sid string) (err error) {
 }
 
 func (s *Session) gc() {
+	// not gc if frequency is non-positive
+	if s.gcFrequency <= 0 {
+		return
+	}
 	ticker := time.NewTicker(s.gcFrequency)
 	for {
 		select {

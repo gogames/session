@@ -1,7 +1,6 @@
 package session
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 )
@@ -15,11 +14,10 @@ func Test_Session(t *testing.T) {
 	test(t, memorySession())
 }
 
-func test(t *testing.T, s *Session) {
-	sid, key, val := "", "helloKey", specialType{}
+func test(t *testing.T, s Session) {
+	sid, key, val := s.GenerateID(), "helloKey", specialType{}
 
-	sid, err := s.Set(sid, key, val)
-	if err != nil {
+	if err := s.Set(sid, key, val); err != nil {
 		t.Fatal(err)
 	}
 
@@ -27,13 +25,14 @@ func test(t *testing.T, s *Session) {
 		t.Fatalf("the value is not %v", val)
 	}
 
-	time.Sleep(5 * time.Millisecond)
+	time.Sleep(1200 * time.Millisecond)
 
 	if value := s.Get(sid, key); value != nil {
 		t.Fatalf("the value should be nil interface{} but get %v", value)
 	}
 
-	nsid, err := s.Set("", "ha", "lo")
+	nsid := s.GenerateID()
+	err := s.Set(nsid, "ha", "lo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,22 +44,15 @@ func test(t *testing.T, s *Session) {
 		t.Fatal(err)
 	}
 
-	s.Close()
-
-	if nsid, _ = s.Set(nsid, "what", "the"); nsid != "" {
-		t.Fatal("still can set after session is close")
+	if err := s.Set(nsid, "what", "the"); err == nil {
+		t.Fatal("error should be nil")
 	}
 }
 
-func fileSession() *Session {
-	config, _ := json.Marshal(map[string]interface{}{
-		"path":      "dir",
-		"separator": "/",
-	})
-
-	return NewSession(STORE_FILE, time.Millisecond, time.Millisecond, string(config))
+func fileSession() Session {
+	return NewSession(NewFileStore(nil, "dir", "/", 1*time.Second), 50)
 }
 
-func memorySession() *Session {
-	return NewSession(STORE_MEMORY, time.Millisecond, time.Millisecond, "")
+func memorySession() Session {
+	return NewSession(NewMemoryStore(nil, 1*time.Second), 50)
 }

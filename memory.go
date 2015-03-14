@@ -2,30 +2,30 @@
 package session
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
 
-const STORE_MEMORY = "memory"
+var _ SessionStore = new(memory)
 
-type memory struct {
+type memoryElement struct {
 	data       map[string]interface{}
 	lastUpdate time.Time
-
-	sid string
-	rwl sync.RWMutex
 }
 
-func init() {
-	Register(STORE_MEMORY, newMemoryStore)
+type memory struct {
+	data       map[string]*memoryElement
+	lifeTime   time.Duration
+	generateID func() string
+	rwl        sync.RWMutex
 }
 
-func newMemoryStore(sid string, conf string) SessionStore {
-	return &memory{
-		data:       make(map[string]interface{}),
-		lastUpdate: time.Now(),
-		sid:        sid,
+func NewMemoryStore(IDGenerator func() string, lifeTime time.Duration) *memory {
+	if IDGenerator == nil {
+		IDGenerator = DefaultGenerator
 	}
+	return &memory{make(map[string]*memoryElement), lifeTime, IDGenerator, sync.RWMutex{}}
 }
 
 func (m *memory) withReadLock(f func()) {
@@ -40,46 +40,82 @@ func (m *memory) withWriteLock(f func()) {
 	f()
 }
 
-func (m *memory) SessionId() string { return m.sid }
-
-func (m *memory) Expire() error { return nil }
-
-func (m *memory) Update() error {
-	m.lastUpdate = time.Now()
+func (m *memory) Expire(ID string) error {
+	m.withWriteLock(func() {
+		delete(m.data, ID)
+	})
 	return nil
 }
 
-func (m *memory) Init() map[string]time.Time { return nil }
+func (m *memory) Update(ID string) error {
+	m.withWriteLock(func() {
+		if d, ok := m.data[ID]; ok {
+			d.lastUpdate = time.Now()
+		}
+	})
+	return nil
+}
 
-func (m *memory) Iterate(f func(key string, val interface{})) {
+var errSessionFlushed = fmt.Errorf("session flushed")
+
+func (m *memory) Set(ID string, key string, val interface{}) (err error) {
+	m.withWriteLock(func() {
+		if m.data == nil {
+			err = errSessionFlushed
+			return
+		}
+		if d, ok := m.data[ID]; ok {
+			d.data[key] = val
+		}
+	})
+	return
+}
+
+func (m *memory) Get(ID string, key string) (val interface{}) {
 	m.withReadLock(func() {
-		for key, val := range m.data {
-			f(key, val)
+		if d, ok := m.data[ID]; ok {
+			val = d.data[key]
+		}
+	})
+	return
+}
+
+func (m *memory) Delete(ID string, key string) error {
+	m.withWriteLock(func() {
+		if d, ok := m.data[ID]; ok {
+			delete(d.data, key)
+		}
+	})
+	return nil
+}
+
+func (m *memory) Flush() error {
+	m.withWriteLock(func() {
+		m.data = nil
+	})
+	return nil
+}
+
+func (m *memory) GC(t time.Time) {
+	m.withWriteLock(func() {
+		for ID, d := range m.data {
+			if d.lastUpdate.Add(m.lifeTime).Before(t) {
+				delete(m.data, ID)
+			}
 		}
 	})
 }
 
-func (m *memory) Set(key string, val interface{}) error {
+func (m *memory) GenerateID() (id string) {
 	m.withWriteLock(func() {
-		m.data[key] = val
-		m.update()
+		for {
+			id = m.generateID()
+			if _, ok := m.data[id]; ok {
+				continue
+			}
+			m.data[id] = &memoryElement{make(map[string]interface{}), time.Now()}
+			break
+		}
 	})
-	return nil
-}
-
-func (m *memory) Get(key string) (val interface{}) {
-	m.withReadLock(func() { val = m.data[key] })
 	return
 }
-
-func (m *memory) Delete(key string) error {
-	m.withWriteLock(func() {
-		delete(m.data, key)
-		m.update()
-	})
-	return nil
-}
-
-func (m *memory) update() { m.lastUpdate = time.Now() }
-
-func (m memory) LastUpdate() time.Time { return m.lastUpdate }

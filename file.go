@@ -102,18 +102,6 @@ func (f file) Flush() error {
 	return os.RemoveAll(f.root)
 }
 
-// mtime of session directory
-func (f file) lastUpdate(ID string) time.Time {
-	if ID == "" {
-		return nil
-	}
-	stat, err := os.Stat(f.directoryPath(ID))
-	if err != nil {
-		return time.Time{}
-	}
-	return stat.ModTime()
-}
-
 // GC removes all expired sessions
 func (f file) GC(lifeTime time.Duration, t time.Time) {
 	filepath.Walk(f.root,

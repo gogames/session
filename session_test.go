@@ -50,9 +50,9 @@ func test(t *testing.T, s Session) {
 }
 
 func fileSession() Session {
-	return NewSession(NewFileStore(nil, "dir", "/", 1*time.Second), 50)
+	return NewSession(NewFileStore(nil, "dir", "/"), 1*time.Second, 50)
 }
 
 func memorySession() Session {
-	return NewSession(NewMemoryStore(nil, 1*time.Second), 50)
+	return NewSession(NewMemoryStore(nil), 1*time.Second, 50)
 }

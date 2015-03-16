@@ -13,19 +13,18 @@ type file struct {
 	root          string
 	pathSeparator string
 	generateID    func() string
-	lifeTime      time.Duration
 }
 
 var _ SessionStore = file{}
 
-func NewFileStore(IDGenerator func() string, rootPath string, pathSeparator string, lifeTime time.Duration) file {
+func NewFileStore(IDGenerator func() string, rootPath string, pathSeparator string) file {
 	if err := os.MkdirAll(rootPath, os.ModePerm); err != nil {
 		panic(err)
 	}
 	if IDGenerator == nil {
 		IDGenerator = DefaultGenerator
 	}
-	return file{rootPath, pathSeparator, IDGenerator, lifeTime}
+	return file{rootPath, pathSeparator, IDGenerator}
 }
 
 func (f file) directoryPath(ID string) string {
@@ -98,7 +97,7 @@ func (f file) lastUpdate(ID string) time.Time {
 }
 
 // GC removes all expired sessions
-func (f file) GC(t time.Time) {
+func (f file) GC(lifeTime time.Duration, t time.Time) {
 	filepath.Walk(f.root,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -110,7 +109,7 @@ func (f file) GC(t time.Time) {
 			if path == f.root {
 				return nil
 			}
-			if info.ModTime().Add(f.lifeTime).Before(t) {
+			if info.ModTime().Add(lifeTime).Before(t) {
 				return os.RemoveAll(path)
 			}
 			return nil

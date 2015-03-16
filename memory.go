@@ -16,16 +16,15 @@ type memoryElement struct {
 
 type memory struct {
 	data       map[string]*memoryElement
-	lifeTime   time.Duration
 	generateID func() string
 	rwl        sync.RWMutex
 }
 
-func NewMemoryStore(IDGenerator func() string, lifeTime time.Duration) *memory {
+func NewMemoryStore(IDGenerator func() string) *memory {
 	if IDGenerator == nil {
 		IDGenerator = DefaultGenerator
 	}
-	return &memory{make(map[string]*memoryElement), lifeTime, IDGenerator, sync.RWMutex{}}
+	return &memory{make(map[string]*memoryElement), IDGenerator, sync.RWMutex{}}
 }
 
 func (m *memory) withReadLock(f func()) {
@@ -96,10 +95,10 @@ func (m *memory) Flush() error {
 	return nil
 }
 
-func (m *memory) GC(t time.Time) {
+func (m *memory) GC(lifeTime time.Duration, t time.Time) {
 	m.withWriteLock(func() {
 		for ID, d := range m.data {
-			if d.lastUpdate.Add(m.lifeTime).Before(t) {
+			if d.lastUpdate.Add(lifeTime).Before(t) {
 				delete(m.data, ID)
 			}
 		}

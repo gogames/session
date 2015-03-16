@@ -15,16 +15,17 @@ type SessionStore interface {
 	Update(ID string) error
 	Expire(ID string) error
 	Flush() error
-	GC(timeNow time.Time)
+	GC(lifeTime time.Duration, timeNow time.Time)
 }
 
 type Session struct {
 	SessionStore
+	lifeTime                 time.Duration
 	gcFrequencyInMilliSecond int64
 }
 
-func NewSession(store SessionStore, gcFrequencyInMilliSecond int64) Session {
-	s := Session{store, gcFrequencyInMilliSecond}
+func NewSession(store SessionStore, sessionLifeTime time.Duration, gcFrequencyInMilliSecond int64) Session {
+	s := Session{store, sessionLifeTime, gcFrequencyInMilliSecond}
 	go s.gc()
 	return s
 }
@@ -37,7 +38,7 @@ func (s Session) gc() {
 	for {
 		select {
 		case t := <-ticker.C:
-			s.GC(t)
+			s.GC(s.lifeTime, t)
 		}
 	}
 }

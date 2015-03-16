@@ -54,11 +54,17 @@ func (f file) GenerateID() string {
 
 // set value
 func (f file) Set(ID string, key string, val interface{}) error {
+	if ID == "" {
+		return nil
+	}
 	return ioutil.WriteFile(f.filePath(ID, key), marshal(val), os.ModePerm)
 }
 
 // get value according to key
 func (f file) Get(ID string, key string) interface{} {
+	if ID == "" {
+		return nil
+	}
 	b, err := ioutil.ReadFile(f.filePath(ID, key))
 	if err != nil {
 		return nil
@@ -68,16 +74,25 @@ func (f file) Get(ID string, key string) interface{} {
 
 // delete key
 func (f file) Delete(ID string, key string) error {
+	if ID == "" {
+		return nil
+	}
 	return os.Remove(f.filePath(ID, key))
 }
 
 // expire session
 func (f file) Expire(ID string) error {
+	if ID == "" {
+		return nil
+	}
 	return os.RemoveAll(f.directoryPath(ID))
 }
 
 // change mtime and atime
 func (f file) Update(ID string) error {
+	if ID == "" {
+		return nil
+	}
 	t := time.Now()
 	return os.Chtimes(f.directoryPath(ID), t, t)
 }
@@ -89,6 +104,9 @@ func (f file) Flush() error {
 
 // mtime of session directory
 func (f file) lastUpdate(ID string) time.Time {
+	if ID == "" {
+		return nil
+	}
 	stat, err := os.Stat(f.directoryPath(ID))
 	if err != nil {
 		return time.Time{}

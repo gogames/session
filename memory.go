@@ -40,6 +40,9 @@ func (m *memory) withWriteLock(f func()) {
 }
 
 func (m *memory) Expire(ID string) error {
+	if ID == "" {
+		return nil
+	}
 	m.withWriteLock(func() {
 		delete(m.data, ID)
 	})
@@ -47,6 +50,9 @@ func (m *memory) Expire(ID string) error {
 }
 
 func (m *memory) Update(ID string) error {
+	if ID == "" {
+		return nil
+	}
 	m.withWriteLock(func() {
 		if d, ok := m.data[ID]; ok {
 			d.lastUpdate = time.Now()
@@ -58,6 +64,9 @@ func (m *memory) Update(ID string) error {
 var errSessionFlushed = fmt.Errorf("session flushed")
 
 func (m *memory) Set(ID string, key string, val interface{}) (err error) {
+	if ID == "" {
+		return nil
+	}
 	m.withWriteLock(func() {
 		if m.data == nil {
 			err = errSessionFlushed
@@ -71,6 +80,9 @@ func (m *memory) Set(ID string, key string, val interface{}) (err error) {
 }
 
 func (m *memory) Get(ID string, key string) (val interface{}) {
+	if ID == "" {
+		return nil
+	}
 	m.withReadLock(func() {
 		if d, ok := m.data[ID]; ok {
 			val = d.data[key]
@@ -80,6 +92,9 @@ func (m *memory) Get(ID string, key string) (val interface{}) {
 }
 
 func (m *memory) Delete(ID string, key string) error {
+	if ID == "" {
+		return nil
+	}
 	m.withWriteLock(func() {
 		if d, ok := m.data[ID]; ok {
 			delete(d.data, key)

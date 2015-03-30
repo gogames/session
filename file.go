@@ -3,11 +3,14 @@ package session
 
 import (
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 )
+
+const permission = 0775
 
 type file struct {
 	root          string
@@ -18,7 +21,10 @@ type file struct {
 var _ SessionStore = file{}
 
 func NewFileStore(IDGenerator func() string, rootPath string, pathSeparator string) file {
-	if err := os.MkdirAll(rootPath, os.ModePerm); err != nil {
+	if err := os.MkdirAll(rootPath, permission); err != nil {
+		panic(err)
+	}
+	if err := os.Chmod(rootPath, permission); err != nil {
 		panic(err)
 	}
 	if IDGenerator == nil {
@@ -45,7 +51,12 @@ func (f file) GenerateID() string {
 	for {
 		id := f.generateID()
 		directory := f.directoryPath(id)
-		if err := os.Mkdir(directory, os.ModePerm); err != nil {
+		if err := os.Mkdir(directory, permission); err != nil {
+			log.Println(err)
+			continue
+		}
+		if err := os.Chmod(directory, permission); err != nil {
+			log.Println(err)
 			continue
 		}
 		return id
@@ -57,7 +68,7 @@ func (f file) Set(ID string, key string, val interface{}) error {
 	if ID == "" {
 		return nil
 	}
-	return ioutil.WriteFile(f.filePath(ID, key), marshal(val), os.ModePerm)
+	return ioutil.WriteFile(f.filePath(ID, key), marshal(val), permission)
 }
 
 // get value according to key
